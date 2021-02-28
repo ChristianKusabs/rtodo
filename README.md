@@ -1,2 +1,2 @@
 # RTodo
-####### A CLI todo app written in Rust
+###### A CLI todo app written in Rust
