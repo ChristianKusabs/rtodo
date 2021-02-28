@@ -3,10 +3,10 @@ extern crate termion;
 extern crate dirs;
 
 use std::path::Path;
-use std::fs;
-use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader};
-use std::io::prelude::*;
+// use std::collections::BTreeSet;
+use std::fs::{self, File, OpenOptions};
+use std::io::{Write, BufRead, BufReader};
+// use std::io::prelude::*;
 use clap::{Arg, App};
 use termion::color;
 
@@ -45,8 +45,12 @@ fn main() {
         verbose_level = 1;
     }
 
-    // TODO: Check for multiple conflicting flags
-    if matches.is_present("add") {
+    if matches.is_present("add") && matches.is_present("remove") {
+
+        println!("{}Error: {}Both add and remove flag used.", color::Fg(color::Red), color::Fg(color::Reset));
+        std::process::exit(2); 
+
+    } else if matches.is_present("add") {
 
         // Check the user actually gave a todo
         if matches.is_present("todo") {
@@ -70,7 +74,7 @@ fn main() {
 
             // Append to the file
             if let Err(e) = writeln!(file, "{}", matches.value_of("todo").unwrap()) {
-                eprintln!("Couldn't write to file: {}", e);
+                eprintln!("Error: Couldn't write to file: {}", e);
             } else {
                 println!("Added note.");
             }
@@ -79,7 +83,54 @@ fn main() {
         } else {
             
             println!("{}Error: {}No todo specified with add flag present", color::Fg(color::Red), color::Fg(color::Reset));
-            std::process::exit(2);
+            std::process::exit(3);
+
+        }
+    
+    } else if matches.is_present("remove") {
+    
+        if matches.is_present("todo") {
+
+            if verbose_level == 1 {
+                println!("{}Removing todo note: {}{}", color::Fg(color::Red), color::Fg(color::Reset), matches.value_of("todo").unwrap());
+            }
+
+            // Check if the directory exists, if it doesn't make it
+            if !Path::new(dirs::data_dir().unwrap().join("rtodo").as_path()).exists() {
+                println!("You don't have any todo notes.");
+                std::process::exit(0);
+            } else if !Path::new(dirs::data_dir().unwrap().join("rtodo").join("todo.list").as_path()).exists() {
+                println!("You don't have any todo notes.");
+                std::process::exit(0);
+            }
+
+            // Get todo list and then delete the original file
+            let contents = fs::read_to_string(dirs::data_dir().unwrap().join("rtodo").join("todo.list").as_path()).expect("can't read");
+            let _result = fs::remove_file(dirs::data_dir().expect("Couldn't remove file").join("rtodo").join("todo.list").as_path());
+
+            // New file
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(dirs::data_dir().unwrap().join("rtodo").join("todo.list").as_path())
+                .unwrap();
+
+            let mut iter = 1;
+            
+            // Add all lines except the one we're deleting
+            for line in contents.lines() {
+
+                if iter != matches.value_of("todo").expect("couldn't unwrap todo").parse::<i32>().expect("Unable to parse argument to string") {
+                    writeln!(file, "{}", line).expect("can't write");
+                }
+
+                iter += 1;
+            }
+            
+        } else {
+
+            println!("{}Error: {}Please specify a todo item to delete", color::Fg(color::Red), color::Fg(color::Reset));
+            std::process::exit(4);
 
         }
 
